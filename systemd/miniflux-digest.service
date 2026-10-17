@@ -1,0 +1,7 @@
+[Unit]
+Description=Build Miniflux EPUB digest and add it to Calibre
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/miniflux-digest
+TimeoutStartSec=30min

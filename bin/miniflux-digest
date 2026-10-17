@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Build an EPUB of unread entries from one Miniflux category, add it to Calibre,
+# then mark those entries read.
+set -euo pipefail
+
+# MINIFLUX_URL, MINIFLUX_CATEGORY_ID, CALIBRE_SERVER_PORT; see config.example.
+set -a
+. "$HOME/.config/miniflux-digest/config"
+set +a
+BASE=$MINIFLUX_URL
+CATEGORY_ID=$MINIFLUX_CATEGORY_ID
+RECIPE=$HOME/.config/miniflux-digest/miniflux.recipe
+IDS_FILE=$HOME/.cache/miniflux-digest/ids.json
+LIBRARY="$HOME/Calibre Library"
+SERVER_PORT=${CALIBRE_SERVER_PORT:-8081}
+TOKEN=$(<"$HOME/.config/miniflux-token")
+
+unread=$(curl -fsS -m 30 -H "X-Auth-Token: $TOKEN" \
+  "$BASE/v1/categories/$CATEGORY_ID/entries?status=unread&limit=1" |
+  python3 -I -c 'import json,sys; print(json.load(sys.stdin)["total"])')
+if [ "$unread" -eq 0 ]; then
+  echo "No unread entries, nothing to do."
+  exit 0
+fi
+
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
+epub="$out/Miniflux digest $(date +%F).epub"
+
+rm -f "$IDS_FILE"
+ebook-convert "$RECIPE" "$epub"
+
+# calibredb cannot open the library directly while the GUI or calibre-server
+# holds it, so go through the content server when it is up.
+if ss -tln | grep -q ":$SERVER_PORT "; then
+  target="http://localhost:$SERVER_PORT/#${LIBRARY##*/}"
+  target=${target// /_}
+else
+  target=$LIBRARY
+fi
+calibredb add --with-library "$target" "$epub"
+
+python3 -I - "$BASE" "$TOKEN" "$IDS_FILE" <<'EOF'
+import json, sys
+from urllib.request import Request, urlopen
+base, token, ids_file = sys.argv[1:]
+ids = json.load(open(ids_file))
+req = Request(f'{base}/v1/entries', method='PUT',
+              data=json.dumps({'entry_ids': ids, 'status': 'read'}).encode(),
+              headers={'X-Auth-Token': token, 'Content-Type': 'application/json'})
+urlopen(req)
+print(f'Marked {len(ids)} entries read.')
+EOF

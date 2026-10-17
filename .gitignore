@@ -1,0 +1,4 @@
+# Local values (Miniflux URL, category, API token) never go in the repo
+config
+miniflux-token
+*.epub

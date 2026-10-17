@@ -1,0 +1,57 @@
+import json
+import os
+from html import escape
+from urllib.request import Request, urlopen
+
+from calibre.ptempfile import PersistentTemporaryFile
+from calibre.web.feeds.news import BasicNewsRecipe
+
+# Exported from ~/.config/miniflux-digest/config by bin/miniflux-digest.
+BASE = os.environ['MINIFLUX_URL']
+CATEGORY_ID = os.environ['MINIFLUX_CATEGORY_ID']
+TOKEN_FILE = os.path.expanduser('~/.config/miniflux-token')
+# Entry IDs put in this digest; the wrapper marks them read only after the
+# EPUB lands in Calibre, so a failed run doesn't lose articles.
+IDS_FILE = os.path.expanduser('~/.cache/miniflux-digest/ids.json')
+
+
+class MinifluxDigest(BasicNewsRecipe):
+    title = 'Miniflux digest'
+    description = 'Unread entries from one Miniflux category'
+    language = 'en'
+    no_stylesheets = True
+    auto_cleanup = False
+    remove_javascript = True
+    max_articles_per_feed = 100
+    oldest_article = 365
+
+    def parse_index(self):
+        token = open(TOKEN_FILE).read().strip()
+        url = (f'{BASE}/v1/categories/{CATEGORY_ID}/entries'
+               '?status=unread&order=published_at&direction=asc&limit=100')
+        entries = json.load(urlopen(Request(url, headers={'X-Auth-Token': token})))['entries']
+
+        sections = {}
+        for e in entries:
+            # Use the content Miniflux already stored (full text when
+            # "Fetch original content" is on) instead of re-fetching the site.
+            title = escape(e['title'])
+            html = (f'<html><head><meta charset="utf-8"><title>{title}</title></head><body>'
+                    f'<h1>{title}</h1>'
+                    f'<p><i>{escape(e["feed"]["title"])} · {e["published_at"][:10]}</i></p>'
+                    f'{e["content"]}'
+                    f'<p><small>{e["url"]}</small></p></body></html>')
+            pt = PersistentTemporaryFile('.html')
+            pt.write(html.encode('utf-8'))
+            pt.close()
+            sections.setdefault(e['feed']['title'], []).append({
+                'title': e['title'],
+                'url': 'file://' + pt.name,
+                'date': e['published_at'][:10],
+                'description': '',
+            })
+
+        os.makedirs(os.path.dirname(IDS_FILE), exist_ok=True)
+        with open(IDS_FILE, 'w') as f:
+            json.dump([e['id'] for e in entries], f)
+        return list(sections.items())
