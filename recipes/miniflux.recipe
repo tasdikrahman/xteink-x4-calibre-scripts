@@ -1,23 +1,17 @@
 import json
 import os
 from html import escape
-from urllib.request import Request, urlopen
 
 from calibre.ptempfile import PersistentTemporaryFile
 from calibre.web.feeds.news import BasicNewsRecipe
 
-# Exported from ~/.config/miniflux-digest/config by bin/miniflux-digest.
-BASE = os.environ['MINIFLUX_URL']
-CATEGORY_ID = os.environ['MINIFLUX_CATEGORY_ID']
-TOKEN_FILE = os.path.expanduser('~/.config/miniflux-token')
-# Entry IDs put in this digest; the wrapper marks them read only after the
-# EPUB lands in Calibre, so a failed run doesn't lose articles.
-IDS_FILE = os.path.expanduser('~/.cache/miniflux-digest/ids.json')
+# Written by lib/fetch_entries.py; path exported by bin/miniflux-digest.
+ENTRIES_FILE = os.environ['MINIFLUX_ENTRIES_FILE']
 
 
 class MinifluxDigest(BasicNewsRecipe):
     title = 'Miniflux digest'
-    description = 'Unread entries from one Miniflux category'
+    description = 'New entries from selected Miniflux feeds'
     language = 'en'
     no_stylesheets = True
     auto_cleanup = False
@@ -26,10 +20,7 @@ class MinifluxDigest(BasicNewsRecipe):
     oldest_article = 365
 
     def parse_index(self):
-        token = open(TOKEN_FILE).read().strip()
-        url = (f'{BASE}/v1/categories/{CATEGORY_ID}/entries'
-               '?status=unread&order=published_at&direction=asc&limit=100')
-        entries = json.load(urlopen(Request(url, headers={'X-Auth-Token': token})))['entries']
+        entries = json.load(open(ENTRIES_FILE))
 
         sections = {}
         for e in entries:
@@ -50,8 +41,4 @@ class MinifluxDigest(BasicNewsRecipe):
                 'date': e['published_at'][:10],
                 'description': '',
             })
-
-        os.makedirs(os.path.dirname(IDS_FILE), exist_ok=True)
-        with open(IDS_FILE, 'w') as f:
-            json.dump([e['id'] for e in entries], f)
         return list(sections.items())

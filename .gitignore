@@ -1,4 +1,5 @@
-# Local values (Miniflux URL, category, API token) never go in the repo
+# Local values (Miniflux URL, feed IDs, API token) never go in the repo
 config
 miniflux-token
 *.epub
+__pycache__/

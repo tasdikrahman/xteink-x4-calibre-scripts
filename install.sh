@@ -11,7 +11,6 @@ link() {
 }
 
 link bin/miniflux-digest              "$HOME/.local/bin/miniflux-digest"
-link recipes/miniflux.recipe          "$HOME/.config/miniflux-digest/miniflux.recipe"
 link systemd/miniflux-digest.service  "$HOME/.config/systemd/user/miniflux-digest.service"
 link systemd/miniflux-digest.timer    "$HOME/.config/systemd/user/miniflux-digest.timer"
 
