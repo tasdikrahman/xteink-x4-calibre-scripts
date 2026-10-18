@@ -10,8 +10,8 @@ link() {
   echo "$2 -> $repo/$1"
 }
 
-link bin/miniflux-digest              "$HOME/.local/bin/miniflux-digest"
-link systemd/miniflux-digest.service  "$HOME/.config/systemd/user/miniflux-digest.service"
-link systemd/miniflux-digest.timer    "$HOME/.config/systemd/user/miniflux-digest.timer"
+link bin/miniflux-digest                "$HOME/.local/bin/miniflux-digest"
+link systemd/miniflux-digest@.service   "$HOME/.config/systemd/user/miniflux-digest@.service"
+link systemd/miniflux-digest@.timer     "$HOME/.config/systemd/user/miniflux-digest@.timer"
 
 systemctl --user daemon-reload

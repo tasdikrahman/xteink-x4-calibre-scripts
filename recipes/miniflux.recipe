@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from html import escape
 
 from calibre.ptempfile import PersistentTemporaryFile
@@ -7,10 +8,14 @@ from calibre.web.feeds.news import BasicNewsRecipe
 
 # Written by lib/fetch_entries.py; path exported by bin/miniflux-digest.
 ENTRIES_FILE = os.environ['MINIFLUX_ENTRIES_FILE']
+# "feed": one section per feed. "day": one section per publication day,
+# for digests that are mostly a single feed.
+GROUP_BY = os.environ.get('MINIFLUX_GROUP_BY', 'feed')
 
 
 class MinifluxDigest(BasicNewsRecipe):
-    title = 'Miniflux digest'
+    # Also drawn on the generated cover, so each profile's books look distinct.
+    title = os.environ.get('MINIFLUX_DIGEST_TITLE', 'Miniflux digest')
     description = 'New entries from selected Miniflux feeds'
     language = 'en'
     no_stylesheets = True
@@ -18,6 +23,12 @@ class MinifluxDigest(BasicNewsRecipe):
     remove_javascript = True
     max_articles_per_feed = 100
     oldest_article = 365
+
+    # Small e-ink screen (Xteink X4 is 480x800): shrink and recompress images,
+    # which is most of a digest's file size.
+    scale_news_images_to_device = False
+    scale_news_images = (480, 800)
+    compress_news_images = True
 
     def parse_index(self):
         entries = json.load(open(ENTRIES_FILE))
@@ -35,7 +46,11 @@ class MinifluxDigest(BasicNewsRecipe):
             pt = PersistentTemporaryFile('.html')
             pt.write(html.encode('utf-8'))
             pt.close()
-            sections.setdefault(e['feed']['title'], []).append({
+            if GROUP_BY == 'day':
+                section = datetime.fromisoformat(e['published_at']).strftime('%a %d %b')
+            else:
+                section = e['feed']['title']
+            sections.setdefault(section, []).append({
                 'title': e['title'],
                 'url': 'file://' + pt.name,
                 'date': e['published_at'][:10],

@@ -1,0 +1,21 @@
+# One digest. Copy to ~/.config/miniflux-digest/<profile>.conf, e.g. main.conf,
+# and enable its timer: systemctl --user enable --now miniflux-digest@<profile>.timer
+
+# Book title, also drawn on the cover. Must be unique per profile: the cleanup
+# finds this profile's old books by it. Avoid regex characters such as ( [ * +.
+MINIFLUX_DIGEST_TITLE="Miniflux digest"
+# Comma-separated feed IDs: the number in each feed's page URL,
+# .../feed/<id>/entries. Feeds stay in whatever category they are in.
+MINIFLUX_FEED_IDS=1,2,3
+# Build a new digest at most once every this many days.
+MINIFLUX_DIGEST_EVERY_DAYS=3
+# Sections in the book: "feed" (one per feed) or "day" (one per publication day).
+MINIFLUX_GROUP_BY=feed
+# On the very first run, include entries published in this many past days.
+MINIFLUX_INITIAL_DAYS=7
+# Most entries in one digest; the rest go into the next one.
+MINIFLUX_MAX_ENTRIES=100
+# Skip entries with less text than this (link-only posts, unextractable tweets).
+MINIFLUX_MIN_CHARS=0
+# Delete this profile's digest books from Calibre once added this many days ago.
+MINIFLUX_KEEP_DAYS=14

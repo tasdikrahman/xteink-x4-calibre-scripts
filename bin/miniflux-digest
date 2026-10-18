@@ -1,28 +1,52 @@
 #!/usr/bin/env bash
-# Build an EPUB of new entries from selected Miniflux feeds and add it to
-# Calibre. Remembers the newest entry sent, so each digest only has entries
-# not sent before. Read/unread status in Miniflux is left alone.
+# Build an EPUB digest of new entries from selected Miniflux feeds and add it
+# to Calibre. Each profile (~/.config/miniflux-digest/<profile>.conf) is its
+# own digest, with its own feeds, schedule and state. Remembers the newest
+# entry sent, so a digest only has entries not sent before. Read/unread status
+# in Miniflux is left alone.
+#
+# Usage: miniflux-digest [--force] [PROFILE]    PROFILE defaults to "main".
 set -euo pipefail
 
-repo=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+force=
+if [ "${1:-}" = --force ]; then
+  force=1
+  shift
+fi
+profile=${1:-main}
 
-# MINIFLUX_URL, MINIFLUX_FEED_IDS, MINIFLUX_INITIAL_DAYS, CALIBRE_SERVER_PORT;
-# see config.example.
+repo=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+conf_dir=$HOME/.config/miniflux-digest
+if [ ! -f "$conf_dir/$profile.conf" ]; then
+  echo "No such profile: $conf_dir/$profile.conf" >&2
+  exit 1
+fi
+
+# Shared settings first (MINIFLUX_URL, CALIBRE_SERVER_PORT), then the
+# profile's own; see config.example and profile.conf.example.
 set -a
-. "$HOME/.config/miniflux-digest/config"
+. "$conf_dir/config"
+. "$conf_dir/$profile.conf"
 set +a
-STATE_FILE=$HOME/.local/state/miniflux-digest/last-entry-id
-DONE_FILE=$HOME/.local/state/miniflux-digest/last-run-date
+state_dir=$HOME/.local/state/miniflux-digest/$profile
+STATE_FILE=$state_dir/last-entry-id
+DONE_FILE=$state_dir/last-run-date
 LIBRARY="$HOME/Calibre Library"
 SERVER_PORT=${CALIBRE_SERVER_PORT:-8081}
 KEEP_DAYS=${MINIFLUX_KEEP_DAYS:-14}
+EVERY_DAYS=${MINIFLUX_DIGEST_EVERY_DAYS:-1}
+export MINIFLUX_DIGEST_TITLE=${MINIFLUX_DIGEST_TITLE:-Miniflux digest}
 
 # The timer fires hourly so a laptop that is rarely awake still gets a run;
-# only the first successful run of the day does anything. --force skips this.
+# only the first successful run once EVERY_DAYS have passed does anything.
 today=$(date +%F)
-if [ "${1:-}" != --force ] && [ "$(cat "$DONE_FILE" 2>/dev/null)" = "$today" ]; then
-  echo "Already ran today, nothing to do."
-  exit 0
+last=$(cat "$DONE_FILE" 2>/dev/null || true)
+if [ -z "$force" ] && [ -n "$last" ]; then
+  due=$(date -d "$last + $EVERY_DAYS days" +%F)
+  if [ "$due" \> "$today" ]; then
+    echo "$profile: last digest $last, next due $due."
+    exit 0
+  fi
 fi
 
 # Right after resume, WiFi and Tailscale may not be up yet.
@@ -40,32 +64,37 @@ else
   target=$LIBRARY
 fi
 
-# Drop digests added more than KEEP_DAYS ago. calibredb remove puts them in
-# Calibre's trash, so a mistake can still be undone from the GUI for a while.
+# Drop this profile's digests added more than KEEP_DAYS ago. Calibre names
+# news books "<title> [Sun, 18 Oct 2026]"; the pattern avoids brackets and
+# backslashes, which would need escaping through both bash and Calibre's
+# query parser. calibredb remove puts them in Calibre's trash, so a mistake
+# can be undone.
 old=$(calibredb search --with-library "$target" \
-  "title:\"~^Miniflux (digest|catch-up)\" and date:<${KEEP_DAYS}daysago" 2>/dev/null || true)
+  "title:\"~^$MINIFLUX_DIGEST_TITLE .[A-Za-z]{3}, [0-9]\" and date:<${KEEP_DAYS}daysago" 2>/dev/null || true)
 if [ -n "$old" ]; then
   calibredb remove --with-library "$target" "$old"
-  echo "Removed digests older than $KEEP_DAYS days: $old"
+  echo "$profile: removed digests older than $KEEP_DAYS days: $old"
 fi
 
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 export MINIFLUX_ENTRIES_FILE=$out/entries.json
 
-mkdir -p "$(dirname "$STATE_FILE")"
+mkdir -p "$state_dir"
 count=$(python3 -I "$repo/lib/fetch_entries.py" "$STATE_FILE" "$out")
 if [ "$count" -eq 0 ]; then
-  echo "No new entries, nothing to do."
+  echo "$profile: no new entries, nothing to do."
+  # Entries may have been fetched and all skipped as too short.
+  if [ -f "$out/last-entry-id" ]; then cp "$out/last-entry-id" "$STATE_FILE"; fi
   echo "$today" > "$DONE_FILE"
   exit 0
 fi
 
-epub="$out/Miniflux digest $(date +%F).epub"
+epub="$out/$MINIFLUX_DIGEST_TITLE $today.epub"
 ebook-convert "$repo/recipes/miniflux.recipe" "$epub"
 calibredb add --with-library "$target" "$epub"
 
 # Only advance after the EPUB is in Calibre, so a failed run is retried.
 cp "$out/last-entry-id" "$STATE_FILE"
 echo "$today" > "$DONE_FILE"
-echo "Added $count entries."
+echo "$profile: added $count entries."

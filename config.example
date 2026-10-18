@@ -1,12 +1,5 @@
-# Copy to ~/.config/miniflux-digest/config and fill in.
+# Shared by all digest profiles. Copy to ~/.config/miniflux-digest/config.
 # Miniflux base URL, no trailing slash.
 MINIFLUX_URL=https://miniflux.example.com
-# Comma-separated feed IDs to put in the digest: the number in each feed's
-# page URL, .../feed/<id>/entries. Feeds stay in whatever category they are in.
-MINIFLUX_FEED_IDS=1,2,3
-# On the very first run, include entries published in this many past days.
-MINIFLUX_INITIAL_DAYS=7
-# Delete digest books from Calibre once they were added this many days ago.
-MINIFLUX_KEEP_DAYS=14
 # Port of calibre-server, if you run one; used to add books while it holds the library.
 CALIBRE_SERVER_PORT=8081

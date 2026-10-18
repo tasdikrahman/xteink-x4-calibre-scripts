@@ -1,0 +1,14 @@
+[Unit]
+Description=Miniflux EPUB digest "%i"
+
+[Timer]
+# Hourly, not at a fixed time: the laptop is rarely awake at any given hour.
+# The script exits early until MINIFLUX_DIGEST_EVERY_DAYS have passed since
+# its last success, and a failed attempt (no network yet, library locked) is
+# retried next hour.
+OnCalendar=hourly
+# Fire on boot/login if an hour boundary passed while powered off.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

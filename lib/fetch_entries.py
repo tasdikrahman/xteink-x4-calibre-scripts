@@ -8,16 +8,20 @@ Read/unread status in Miniflux is ignored and never changed.
 """
 import json
 import os
+import re
 import sys
 import time
 from urllib.request import Request, urlopen
 
 PAGE = 100   # entries asked per feed
-MAX = 100    # entries per digest
 
 base = os.environ['MINIFLUX_URL']
 feed_ids = [f.strip() for f in os.environ.get('MINIFLUX_FEED_IDS', '').split(',') if f.strip()]
 initial_days = int(os.environ.get('MINIFLUX_INITIAL_DAYS', '7'))
+max_entries = int(os.environ.get('MINIFLUX_MAX_ENTRIES', '100'))
+# Skip entries whose text is shorter than this, e.g. link-only posts or
+# tweets the crawler could not extract. They still count as sent.
+min_chars = int(os.environ.get('MINIFLUX_MIN_CHARS', '0'))
 token = open(os.path.expanduser('~/.config/miniflux-token')).read().strip()
 state_file, out_dir = sys.argv[1:]
 
@@ -41,11 +45,13 @@ for fid in feed_ids:
         cutoff = min(cutoff or page[-1]['id'], page[-1]['id'])
 
 entries.sort(key=lambda e: e['id'])
-entries = [e for e in entries if cutoff is None or e['id'] <= cutoff][:MAX]
+entries = [e for e in entries if cutoff is None or e['id'] <= cutoff][:max_entries]
 
-with open(os.path.join(out_dir, 'entries.json'), 'w') as f:
-    json.dump(entries, f)
 if entries:
     with open(os.path.join(out_dir, 'last-entry-id'), 'w') as f:
         f.write(str(entries[-1]['id']))
+entries = [e for e in entries if len(re.sub(r'<[^>]+>', '', e['content']).strip()) >= min_chars]
+
+with open(os.path.join(out_dir, 'entries.json'), 'w') as f:
+    json.dump(entries, f)
 print(len(entries))
