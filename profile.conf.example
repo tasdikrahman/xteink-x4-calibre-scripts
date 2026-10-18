@@ -17,5 +17,8 @@ MINIFLUX_INITIAL_DAYS=7
 MINIFLUX_MAX_ENTRIES=100
 # Skip entries with less text than this (link-only posts, unextractable tweets).
 MINIFLUX_MIN_CHARS=0
+# Skip entries published longer ago than this, e.g. the backlog of a feed you
+# just subscribed to, which Miniflux gives fresh entry IDs.
+MINIFLUX_MAX_AGE_DAYS=14
 # Delete this profile's digest books from Calibre once added this many days ago.
 MINIFLUX_KEEP_DAYS=14

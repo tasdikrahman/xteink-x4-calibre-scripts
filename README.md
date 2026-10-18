@@ -28,6 +28,9 @@ reachable over HTTP(S) from there.
   only has entries newer than that. Nothing is sent twice.
 - **The first run** takes entries published in the last `MINIFLUX_INITIAL_DAYS`
   days instead of each feed's whole backlog.
+- **New subscriptions don't flood a digest.** Miniflux gives a newly added
+  feed's whole backlog fresh entry IDs, so every run skips entries published
+  more than `MINIFLUX_MAX_AGE_DAYS` ago.
 - **Article text comes from Miniflux**, not from re-downloading each site.
   Turn on *Fetch original content* for feeds that only publish a teaser.
   Entries with less than `MINIFLUX_MIN_CHARS` of text are skipped, such as
@@ -129,6 +132,7 @@ reachable over HTTP(S) from there.
 | `MINIFLUX_INITIAL_DAYS` | How far back the very first run goes | `7` |
 | `MINIFLUX_MAX_ENTRIES` | Most entries per digest; the rest go into the next one | `100` |
 | `MINIFLUX_MIN_CHARS` | Skip entries with less text than this | `0` |
+| `MINIFLUX_MAX_AGE_DAYS` | Skip entries published longer ago than this | `14` |
 | `MINIFLUX_KEEP_DAYS` | Remove this profile's digests added this many days ago | `14` |
 
 The API key is read from `~/.config/miniflux-token`. Neither the key nor any

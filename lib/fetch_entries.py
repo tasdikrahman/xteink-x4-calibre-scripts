@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from urllib.request import Request, urlopen
 
 PAGE = 100   # entries asked per feed
@@ -22,6 +23,10 @@ max_entries = int(os.environ.get('MINIFLUX_MAX_ENTRIES', '100'))
 # Skip entries whose text is shorter than this, e.g. link-only posts or
 # tweets the crawler could not extract. They still count as sent.
 min_chars = int(os.environ.get('MINIFLUX_MIN_CHARS', '0'))
+# Skip entries published longer ago than this. A newly subscribed feed's whole
+# backlog gets fresh entry IDs, so without this it would all land in the next
+# digest. They still count as sent.
+max_age_days = int(os.environ.get('MINIFLUX_MAX_AGE_DAYS', '14'))
 token = open(os.path.expanduser('~/.config/miniflux-token')).read().strip()
 state_file, out_dir = sys.argv[1:]
 
@@ -51,6 +56,8 @@ if entries:
     with open(os.path.join(out_dir, 'last-entry-id'), 'w') as f:
         f.write(str(entries[-1]['id']))
 entries = [e for e in entries if len(re.sub(r'<[^>]+>', '', e['content']).strip()) >= min_chars]
+oldest = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+entries = [e for e in entries if datetime.fromisoformat(e['published_at']) >= oldest]
 
 with open(os.path.join(out_dir, 'entries.json'), 'w') as f:
     json.dump(entries, f)
