@@ -2,8 +2,11 @@
 Description=Daily Miniflux EPUB digest
 
 [Timer]
-OnCalendar=*-*-* 06:00
-# Laptop may be asleep at 06:00; run on next wake instead of skipping the day.
+# Hourly, not daily: the laptop is rarely awake at a fixed time. The script
+# exits early once it has succeeded today, so this still means one digest a
+# day, and a failed attempt (no network yet, library locked) is retried next hour.
+OnCalendar=hourly
+# Fire on boot/login if an hour boundary passed while powered off.
 Persistent=true
 
 [Install]

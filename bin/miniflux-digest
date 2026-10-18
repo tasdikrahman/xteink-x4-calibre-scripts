@@ -12,9 +12,24 @@ set -a
 . "$HOME/.config/miniflux-digest/config"
 set +a
 STATE_FILE=$HOME/.local/state/miniflux-digest/last-entry-id
+DONE_FILE=$HOME/.local/state/miniflux-digest/last-run-date
 LIBRARY="$HOME/Calibre Library"
 SERVER_PORT=${CALIBRE_SERVER_PORT:-8081}
 KEEP_DAYS=${MINIFLUX_KEEP_DAYS:-14}
+
+# The timer fires hourly so a laptop that is rarely awake still gets a run;
+# only the first successful run of the day does anything. --force skips this.
+today=$(date +%F)
+if [ "${1:-}" != --force ] && [ "$(cat "$DONE_FILE" 2>/dev/null)" = "$today" ]; then
+  echo "Already ran today, nothing to do."
+  exit 0
+fi
+
+# Right after resume, WiFi and Tailscale may not be up yet.
+for _ in $(seq 12); do
+  curl -fsS -m 5 -o /dev/null "$MINIFLUX_URL/healthcheck" && break
+  sleep 10
+done
 
 # calibredb cannot open the library directly while the GUI or calibre-server
 # holds it, so go through the content server when it is up.
@@ -38,9 +53,11 @@ out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 export MINIFLUX_ENTRIES_FILE=$out/entries.json
 
+mkdir -p "$(dirname "$STATE_FILE")"
 count=$(python3 -I "$repo/lib/fetch_entries.py" "$STATE_FILE" "$out")
 if [ "$count" -eq 0 ]; then
   echo "No new entries, nothing to do."
+  echo "$today" > "$DONE_FILE"
   exit 0
 fi
 
@@ -49,6 +66,6 @@ ebook-convert "$repo/recipes/miniflux.recipe" "$epub"
 calibredb add --with-library "$target" "$epub"
 
 # Only advance after the EPUB is in Calibre, so a failed run is retried.
-mkdir -p "$(dirname "$STATE_FILE")"
 cp "$out/last-entry-id" "$STATE_FILE"
+echo "$today" > "$DONE_FILE"
 echo "Added $count entries."
